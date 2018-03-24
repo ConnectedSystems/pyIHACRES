@@ -1,0 +1,99 @@
+406214:
+    node_type: StreamNode
+    prev_node:
+    next_node: 406201
+    formula_type: 1
+    def_col:  # d, e, f parameters
+        - 166.59
+        - 1.047
+        - 125.68507
+    initial_storage: 0.0
+    storage_coef: 2.9
+
+406219:
+    node_type: StreamNode
+    prev_node:
+    next_node: 406000
+    formula_type: 1
+    def_col:
+        - 400
+        - 1.1
+        - 0.5 # 1040
+    initial_storage: 0.0
+    storage_coef: 2.9
+
+406000:
+    node_type: DamNode
+    prev_node:
+        - 406219
+    next_node: 406201
+    initial_storage: 300000.0
+    max_storage: 306000.0
+    formula_type: 0
+    storage_coef: 0.0
+
+406201:
+    node_type: StreamNode
+    prev_node:
+        - 406214
+        - 406000
+    next_node: 406218
+    formula_type: 1
+    def_col:
+        - 400
+        - 1
+        - 160
+    initial_storage: 0.0
+    storage_coef: 2.9
+
+406224:
+    node_type: StreamNode
+    prev_node:
+    next_node: 406218
+    formula_type: 1
+    def_col:
+        - 154.88928
+        - 0.995
+        - 87.914008
+    initial_storage: 0.0
+    storage_coef: 2.9
+
+406218:
+    node_type: StreamNode
+    prev_node:
+        - 406201
+        - 406224
+    next_node: 406202
+    formula_type: 1
+    def_col:
+        - 400
+        - 1
+        - 160
+    initial_storage: 0.0
+    storage_coef: 2.9
+
+406202:
+    node_type: StreamNode
+    prev_node:
+        - 406218
+    next_node: 406265
+    formula_type: 1
+    def_col:
+        - 400
+        - 1
+        - 160
+    initial_storage: 0.0
+    storage_coef: 2.9
+
+406265:
+    node_type: StreamNode
+    prev_node:
+        - 406202
+    next_node:
+    formula_type: 1
+    def_col:
+        - 400
+        - 1
+        - 160
+    initial_storage: 0.0
+    storage_coef: 2.9
