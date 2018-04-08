@@ -1,27 +1,172 @@
 from __future__ import division
 
-import numpy as np
+from math import atan, exp, log, pi, tan
 
 
-def calc_cmd(prev_cmd, rainfall, et, effective_rainfall):
+def calc_cmd(prev_cmd, rainfall, et, effective_rainfall, recharge):
     """Calculate Catchment Moisture Deficit.
 
     Min value of CMD is 0.0 and is in represented in mm depth.
     A value of 0 indicates that the catchment is fully saturated.
     A value greater than 0 means that there is a moisture deficit.
     """
-    cmd = prev_cmd - rainfall + et + effective_rainfall  # units in mm
+    cmd = prev_cmd + et + effective_rainfall + recharge - rainfall  # units in mm
+    # cmd = interim_cmd - rainfall + et + effective_rainfall
     return max(0.0, cmd)
+
 # End calc_cmd()
 
 
-def calc_effective_rainfall(cmd, d):
-    e_rain = 1 - min(1, cmd / d)
-    return e_rain
+def calc_interim_cmd(cmd, param_d, rainfall):
+    """Calculate interim CMD (M_{f}) in its linear form.
+
+    Based on HydroMad implementation.
+
+    :param cmd: float, current Catchment Moisture Deficit (M_{k})
+    :param param_d: float, model parameter factor `d`
+    :param rainfall: float, rainfall for current time step in mm
+
+    :returns: float, interim CMD (M_{f})
+    """
+    if cmd < param_d:
+        Mf = cmd * exp(-rainfall / param_d)
+    elif cmd < (param_d + rainfall):
+        Mf = param_d * exp((-rainfall + cmd - param_d) / param_d)
+    else:
+        Mf = cmd - rainfall
+    # End if
+
+    return Mf
+# End calc_interim_cmd()
+
+
+def calc_trig_interim_cmd(cmd, param_d, rainfall):
+    """Calculate interim CMD (M_{f}) in its trigonometric form.
+
+    Based on HydroMad implementation.
+
+    :param cmd: float, current Catchment Moisture Deficit (M_{k})
+    :param param_d: float, model parameter factor `d`
+    :param rainfall: float, rainfall for current time step in mm
+
+    :returns: float, interim CMD (M_{f})
+    """
+    if cmd < param_d:
+        Mf = 1.0 / tan((cmd / param_d) * (pi / 2.0))
+        Mf = (2.0 * param_d / pi) * atan(1.0 / (pi * rainfall / (2.0 * param_d) + Mf))
+    elif (rainfall < (param_d + rainfall)):
+        Mf = (2.0 * param_d / pi) * atan(2.0 * param_d / (pi * (param_d - cmd + rainfall)))
+    else:
+        Mf = cmd - rainfall
+    # End if
+
+    return Mf
+# End calc_trig_interim_cmd()
+
+
+def calc_ft_interim(cmd, rain, d, d2, alpha):
+    """Direct port of original Fortran implementation to calculate interim CMD.
+
+    :param cmd: float, Catchment Moisture Deficit
+    :param rain: float, rainfall for time step in mm
+    :param d: float, flow threshold value
+    :param d2: float, scaling factor applied to `d`
+    :param alpha: float, took value from IHACRESparams.csv file for 406219 for dev purposes only
+
+    :returns: tuple[float], interim CMD value, effective rainfall, recharge (all in mm)
+    """
+    d2 = d * d2
+
+    tmp_cmd = cmd
+    e_rain = 0.0
+    recharge = 0.0
+    if rain == 0.0:
+        return cmd, e_rain, recharge
+    # End if
+
+    if tmp_cmd > (d2 + rain):
+        # CMD never reaches d2, so all rain is effective
+        cmd = tmp_cmd - rain
+    else:
+        if tmp_cmd > d2:
+            tmp_rain = rain - (tmp_cmd - d2)  # leftover rain after reaching d2 threshold
+            tmp_cmd = d2
+        else:
+            tmp_rain = rain
+        # End if
+
+        d1a = d * (2.0 - exp(-(rain / 50.0)**2))
+        if tmp_cmd > d1a:
+            eps = d2 / (1.0 - alpha)
+
+            # original comment: now get rainfall to reach cmd = d1a
+            # amount of rain necessary to get to threshold `d`
+            depth_to_d = eps * log((alpha + tmp_cmd / eps) / (alpha + d1a / eps))
+            if depth_to_d > tmp_rain:
+                lam = exp(tmp_rain * (1.0 - alpha) / d2)
+                epsilon = alpha * eps
+
+                cmd = tmp_cmd / lam - epsilon * (1.0 - 1.0 / lam)
+                e_rain = 0.0
+            else:
+                if (tmp_cmd > d1a):
+                    tmp_rain = tmp_rain - depth_to_d
+
+                tmp_cmd = d1a
+                gamma = (alpha * d2 + (1.0 - alpha) * d1a) / (d1a * d2)
+                cmd = tmp_cmd * exp(-tmp_rain * gamma)
+                e_rain = alpha * (tmp_rain + 1.0 / d1a / gamma * (cmd - tmp_cmd))
+            # End if
+        else:
+            gamma = (alpha * d2 + (1.0 - alpha) * d1a) / (d1a * d2)
+            cmd = tmp_cmd * exp(-tmp_rain * gamma)
+            e_rain = alpha * (tmp_rain + 1.0 / d1a / gamma * (cmd - tmp_cmd))
+        # End if
+
+        recharge = rain - (tmp_cmd - cmd) - e_rain
+    # End if
+
+    return cmd, e_rain, recharge
+# End calc_ft_interim()
+
+
+def calc_effective_rainfall(rainfall, cmd, Mf, d, d2, n=0.1):
+    """
+    :param rainfall: float, rainfall for time step
+    :param cmd: float, previous CMD value
+    :param Mf, float, interim CMD value
+    :param d: float, threshold value
+    :param d2: float, scaling factor applied to `d`
+    :param n: float, scaling factor taken from Croke & Jakeman (2004).
+              `n` = 0.1 in suitable for most cases
+    """
+    d2 = d * d2
+    if cmd > d2:
+        e_rainfall = rainfall
+    else:
+        f1 = min(1.0, cmd / d)
+        f2 = min(1.0, cmd / d2)
+        e_rainfall = rainfall * ((1.0 - n) * (1.0 - f1) + (n * (1.0 - f2)))
+    # End if
+
+    return e_rainfall
 # End calc_effective_rainfall()
 
 
-def calc_ET_from_temp(e, T, p_cmd, f, d):
+def calc_effective_rainfall_orig(rainfall, cmd, Mf, d, d2):
+    d2 = d * d2
+    if cmd > d2:
+        e_rainfall = rainfall
+    else:
+        # effective rainfall = rainfall - prev_cmd + (cmd before ET loss is accounted for)
+        e_rainfall = max(0.0, rainfall - cmd + Mf)
+    # End if
+
+    return e_rainfall
+# End calc_effective_rainfall2()
+
+
+def calc_ET_from_temp(e, T, interim_cmd, f, d):
     """Calculate evapotranspiration based on temperature data.
 
     Parameters `f` and `d` are used to calculate `g`, the value of the CMD
@@ -30,70 +175,113 @@ def calc_ET_from_temp(e, T, p_cmd, f, d):
 
     :param e: float, temperature to PET conversion factor (a stress threshold)
     :param T: float or None, temperature in degrees C
-    :param p_cmd: float, Catchment Moisture Deficit prior to accounting for ET losses
+    :param interim_cmd: float, Catchment Moisture Deficit prior to accounting for ET losses (`M_{f}`)
     :param f: float, multiplication factor on `d`
     :param d: float, flow threshold factor
     """
-    g = f * d
-    et = e * T * np.exp(2.0 * (1 - (p_cmd / g)))
+    param_g = f * d
+    et = e * T * exp(2.0 * (1.0 - (interim_cmd / param_g)))
+
+    # temperature can be negative, so we have a min cap of 0.0
+    return max(0.0, et)
+# End calc_ET_from_temp()
+
+
+def calc_ET(e, evap, interim_cmd, f, d):
+    """Calculate evapotranspiration
+
+    :param e: float, temperature to PET conversion factor (a stress threshold)
+    :param evap: float, evaporation for given time step.
+    :param interim_cmd: float, Catchment Moisture Deficit prior to accounting for ET losses (`M_{f}`)
+    :param f: float, calibrated parameter that acts as a multiplication factor on `d`
+    :param d: float, flow threshold factor
+    """
+    et = e * evap
+    param_g = f * d
+    et = et * min(1.0, exp(2.0 * (1.0 - (interim_cmd / param_g))))
+
     return et
 # End calc_ET()
 
 
-def calc_ET(e, et, p_cmd, f, d):
-    """Stub function. Available data provides ET, but currently unsure if some scaling should be applied.
+def calc_flow(tau, flow, v, e_rainfall):
+    """Common function to calculate quick and slow flows.
+
+    :param tau: float, `tau` value for flow
+    :param flow: float, proportional quick or slow flow in ML/day
+    :param v: float, `v` parameter
+    :param e_rainfall: float, effective rainfall in mm (`E` parameter in literature)
+
+    :returns: float, adjusted quick or slow flow in ML/day
     """
-    return et
+    # convert from 'tau' and 'v' to 'alpha' and 'beta'
+    alpha = exp(-1.0 / tau)
+    beta = v * (1.0 - alpha)
+
+    flow = (-alpha * flow) + (1.0 - alpha) * (beta * e_rainfall)
+
+    return flow
+# End calc_flow()
 
 
-def partition_flow(alpha, flow, v, e_rainfall):
-    # q_k = (a[0] * q[k - 1] + a[1] * q[k - 2]) + b[0] * u[k] + b[1] * u[k - 1]
-    return (alpha * flow) + (1 - alpha) * (v * e_rainfall)
-
-
-def calc_flows(timestep, flows, e_rainfall, ab):
-    """Calculate total streamflow.
-
-    Total streamflow is the sum of quickflow and slowflow.
-
-    :param flows: list[float], time series of outflow
-    :param e_rainfall: float, effective rainfall in mm
-    :param ab: tuple[float] of length 2, calibrated constants for quick and slow flows,
-                   values between 0 and 1.
-    # :param p_factors: tuple[float] of length 2, proportion of effective rainfall diverted into quickflow and slowflow,
-    #                   Constitutes parameters `v_q` and `v_s` (must sum to 1.0)
-
-    :returns: tuple[float] of length 2, quickflow and slowflow
+def calc_flows(prev_flows, v_s, e_rainfall, taus):
     """
-    # a, b = tau_v_to_ab(taus, p_factors)
-    a, b = ab
+    Calculate quick and slow flow, and outflow.
 
-    k = timestep
-    try:
-        q_k1 = flows[k - 1]
-        q_k2 = flows[k - 2]
-    except IndexError:
-        q_k1 = 0.0  # flows[-1]
-        q_k2 = 0.0
-    # End if
+    Calculates flows for current time step based on previous flows and current effective rainfall.
 
-    try:
-        e_k = e_rainfall[k]
-        e_k1 = e_rainfall[k - 1]
-    except IndexError:
-        e_k = e_rainfall[-1]
-        e_k1 = 0.0
-    # End if
+    :param prev_flows: tuple[float], previous quick and slow flow in ML/day
+    :param v_s: float, proportional amount that goes to slow flow. v_s <= 1.0
+    :param e_rainfall: float, current and previous effective rainfall
+    :param taus: dict[q, s], time constant, quick and slow flow tau variables.
+                               Represent the time required for the quickflow and slowflow
+                               responses to fall to :math:`1/e` of their initial values after an impulse of rainfall
 
-    quickflow = max(0.0, a[0] * q_k1)
-    slowflow = max(0.0, a[1] * q_k2)
-    # quickflow = partition_flow(quick_alpha, prev_quickflow, quick_v, e_rainfall)
-    # slowflow = partition_flow(slow_alpha, prev_slowflow, slow_v, e_rainfall)
+    :returns: tuple[float], quick, slow, outflow in ML/day
+    """
+    prev_quick, prev_slow = prev_flows
+    v_q = 1.0 - v_s  # proportional quick flow
+    quick = calc_flow(taus['q'], prev_quick, v_q, e_rainfall)
+    slow = calc_flow(taus['s'], prev_slow, v_s, e_rainfall)
+    outflow = (quick + slow)
 
-    outflow = (quickflow + slowflow) + b[0] * e_k + b[1] * e_k1
-
-    return quickflow, slowflow, outflow
+    return quick, slow, outflow
 # End calc_flows()
+
+
+def routing(volume, storage_coef, inflow, flow, irrig_ext, gamma=0.0):
+    """Linear routing used to convert effective rainfall into streamflow for a given time step.
+
+    :param volume: float, catchment moisture deficit
+    :param storage_coef: float, unknown parameter
+    :param inflow: float, incoming streamflow (flow from previous node)
+    :param flow: float, flow for the node
+    :param irrig_ext: float, volume of irrigation extraction in ML.
+    :param gamma: float, unknown parameter which is always set to 0.0 in the original Fortran implementation.
+
+    :returns: tuple[float], (cmd in mm, and streamflow in ML/day)
+    """
+    threshold = volume + (inflow + flow + gamma) - irrig_ext
+    if threshold > 0.0:
+        volume = (1.0 / (1.0 + storage_coef)) * threshold
+        outflow = storage_coef * volume
+    else:
+        volume = threshold
+        outflow = 0.0
+    # End if
+
+#     v1=volume+(node_inflow+local_inflow+Gamma_k)-irrig_ext
+#
+#     if (v1.gt.0) then
+#      volume = 1/(1+storage_coef) * v1
+#      outflow=storage_coef*volume
+#     else
+#      volume = v1
+#      outflow=0.0
+#     endif
+
+    return volume, outflow
+# End routing()
 
 
 def calc_outflow(flow, extractions):
@@ -102,40 +290,41 @@ def calc_outflow(flow, extractions):
     :param flow: float, unmodified sum of quickflow and slowflow in ML/day
     :param extractions: float, water extractions that occurred in ML/day
     """
-    # outflow = flow + b[0] * e_rainfall[k] + b[1] * e_rainfall[k - 1]
-    return flow - extractions
+    return max(0.0, flow - extractions)
 # End calc_outflow()
 
 
-def tau_v_to_ab(tau, v):
-    """Calculate tau and v to `a` and `b` parameters.
-
-    Subject to:
-    * tau_q < tau_s
-    * v_q + v_s = 1.0
-
-    :param tau: tuple[float]
-    :param v: tuple[float], are the proportions of effective rainfall diverted to quickflow and slowflow
+def calc_ft_flows(prev_quick, prev_slow, e_rain, recharge, area, a, b, loss=0.0):
     """
-    assert tau[0] < tau[1], "`tau` quickflow parameter must be less than slowflow `tau` parameter"
-    assert np.sum(v) == 1.0, "`v` parameter must sum to 1.0"
 
-    alpha = [np.exp(-1.0 / tau_i) for tau_i in tau]
-    beta = [v[i] * (1.0 - alpha[i]) for i in range(len(v))]
+    :param prev_quick: float, previous quickflow storage
+    :param prev_slow: float, previous slowflow storage
+    :param e_rain: float, effective rainfall in mm
+    :param recharge: float, recharge amount in mm
+    :param area: float, catchment area in km^2
+    :param a: float, `a` factor controlling quickflow rate
+    :param b: float, `b` factor controlling slowflow rate
+    :param loss: float, losses in mm depth
 
-    if len(alpha) == 1:
-        a = [alpha[0]]
-        b = [beta[0]]
-    elif len(alpha) == 2:
-        a = [(alpha[0] + alpha[1]),
-             -1.0 * (alpha[0] * alpha[1])]
-
-        b = [beta[0] + beta[1],
-             -1.0 * (beta[0] * (alpha[1]) +
-                     beta[1] * (alpha[0]))]
+    :returns: tuple[float], quick store, slow store, outflow
+    """
+    a2 = 0.5
+    if (prev_quick + e_rain * area - 0.5 * loss) > 0.0:
+        quick_store = 1.0 / (1.0 + a) * (prev_quick + e_rain * area - loss / 2.0)
+        outflow = a * quick_store
     else:
-        raise ValueError("Length of `alpha` must be 1 or 2")
+        a2 = 0.0 if loss == 0.0 else max(0.0, min(1.0, prev_quick + e_rain * area / loss))
+        quick_store = prev_quick + e_rain * area - a2 * loss
+        outflow = 0.0
     # End if
 
-    return a, b
-# End tau_v_to_ab()
+    b2 = 1.0 - a2
+    if (prev_slow + recharge * area - b2 * loss) > 0.0:
+        slow_store = 1.0 / (1.0 + b) * (prev_slow + recharge * area - loss * b2)
+        outflow = outflow + b * slow_store
+    else:
+        slow_store = prev_slow + recharge * area - b2 * loss
+    # End if
+
+    return quick_store, slow_store, outflow
+# End calc_ft_flows()
