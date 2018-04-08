@@ -19,7 +19,7 @@ def calc_dam_level(volume):
 
     :returns: float, dam level in mAHD
     """
-    level = 156.8 + (0.9463 * volume**0.2922)
+    level = 156.8 + 0.9463 * volume**0.2922
 
     return level
 # End calc_dam_level()
@@ -73,14 +73,16 @@ def calc_dam_discharge(volume, max_storage):
         discharge = 0.001492 * (volume - max_storage)**1.5280
     # End if
 
-    return discharge
+    return max(0.0, discharge)
 # End calc_dam_discharge()
 
 
 def dam_volume_update(volume, node_inflow, gamma, rain, evap, infiltration, area, extractions, discharge):
     """Update dam volume for timestep
+
+    gamma is gw exchange
     """
-    vol = volume + (node_inflow + gamma) + ((rain - evap - infiltration) * area) - extractions - discharge
+    vol = volume + (node_inflow + gamma) + (rain - evap - infiltration) * area - extractions - discharge
 
     return max(0.0, vol)
 # End dam_volume_update()
