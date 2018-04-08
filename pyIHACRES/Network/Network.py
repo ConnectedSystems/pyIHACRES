@@ -4,14 +4,6 @@ from DamNode import DamNode
 from StreamNode import StreamNode
 
 
-def load_network(fn, first_node='node_1'):
-    with open(fn, 'r') as network_config:
-        network_details = yaml.load(network_config)
-
-    return Network(network_details, first_node)
-# End load_network()
-
-
 class Network(object):
 
     """Represent a stream network"""
@@ -27,10 +19,19 @@ class Network(object):
             self.construct_nodes(node_id, network_details, network)
         # End for
 
+        self.network_details = network_details
         self.network = network
         self.first_node = first_node
         self.ts = 0
     # End init()
+
+    @staticmethod
+    def load_network(fn, first_node='node_1'):
+        with open(fn, 'r') as network_config:
+            network_details = yaml.load(network_config)
+
+        return Network(network_details, first_node)
+    # End load_network()
 
     def construct_nodes(self, node_id, details, network):
         """Recursively construct nodes.
@@ -83,7 +84,6 @@ class Network(object):
     # End run_timestep()
 
     def reset(self):
-        for idx, node in self.network.items():
-            node.reset()
-        # End for
+        tmp = Network(self.network_details, self.first_node)
+        self.network = tmp.network
     # End for

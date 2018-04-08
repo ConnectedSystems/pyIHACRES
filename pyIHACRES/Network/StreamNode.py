@@ -1,4 +1,4 @@
-import numpy as np
+from __future__ import division
 
 from NetworkNode import NetworkNode
 
@@ -7,20 +7,18 @@ from .. import ihacres_funcs
 
 class StreamNode(NetworkNode):
 
-    def __init__(self, node_id, prev_node, next_node, formula_type, def_col, initial_storage, storage_coef):
-        """next_node is intended to be a reference to the next StreamNode object"""
+    def __init__(self, node_id, prev_node, next_node, formula_type, def_col, initial_storage, storage_coef, alpha, a, b, area):
+        """Stream node"""
         self.node_id = node_id
         self.prev_node = {k: None for k in prev_node} if prev_node else {}
         self.next_node = next_node
         self.formula_type = formula_type
-        # self.a = a
-        # self.b = b
-        # self.h0 = h0
-        self._def_col = def_col  # stored to enable resetting
-        self.d = def_col[0]
-        self.e = def_col[1]
-        self.f = def_col[2]
-        self.storage_coef = storage_coef
+        self.area = area
+
+        self.set_calib_params(def_col, storage_coef, alpha, a, b, flow_mod=1.0)
+
+        self._quickflow = [0.0]
+        self._slowflow = [0.0]
         self._outflow = []
 
         self._initial_storage = initial_storage
@@ -30,27 +28,47 @@ class StreamNode(NetworkNode):
         self._inflow = []  # inflow from each parent node
     # End init()
 
-    def update_state(self, timestep, storage, effective_rainfall, et, outflow):
-        self.storage = storage
+    @property
+    def quickflow(self):
+        return self._quickflow[-1]
+    # End quickflow()
+
+    @property
+    def slowflow(self):
+        return self._slowflow[-1]
+    # End slowflow()
+
+    def set_calib_params(self, def_col, s_coef, alpha, a, b, flow_mod):
+        self.d = def_col[0]
+        self.d2 = def_col[1]
+        self.e = def_col[2]
+        self.f = def_col[3]
+        self.storage_coef = s_coef
+        self.alpha = alpha
+        self.a = a
+        self.b = b
+        self.flow_mod = flow_mod
+
+    # End set_calib_params()
+
+    def get_flows(self):
+        return self._quickflow[-1], self._slowflow[-1], self._outflow[-1]
+
+    def update_state(self, timestep, storage, effective_rainfall, et, qflow_store, sflow_store, outflow):
+        self.storage = (timestep, storage)
         self.effective_rainfall = effective_rainfall
         self.et = et
         self.outflow = (timestep, outflow)
+
+        self.append_timestep(self._quickflow, (timestep, qflow_store))
+        self.append_timestep(self._slowflow, (timestep, sflow_store))
     # End update_state()
 
-    # def run(self, timestep, rain, et, irrig_ext, extractions):
-    #     # extractions are ignored for stream nodes
-    #     e_rain, storage = ihacres_funcs.ihacres_cmd(M_k=self.storage, P_k=rain, E_k=et, d=self.d, e=self.e, f=self.f)
-    #     storage, outflow = ihacres_funcs.routing(storage, self.storage_coef, self.inflow, e_rain, irrig_ext, gamma=0.0)
-    #
-    #     # storage, effective_rainfall, outflow = self.calc_outflow(rain, et, irrig_ext + extractions)
-    #     self.update_state(timestep, storage, e_rain, et, outflow)
-    # # End run()
-
-    def run(self, timestep, rain_et, extractions):
-        """Run node to calculate outflow.
+    def run(self, timestep, rain_evap, extractions):
+        """Run node to calculate outflow and update state.
 
         :param timestep: int, time step
-        :param rain_et: np.ndarray, rainfall and evapotranspiration data for all nodes
+        :param rain_evap: np.ndarray, rainfall and evapotranspiration data for all nodes
         :param extractions: np.ndarray, irrigation and other water extractions for all nodes
 
         :returns: float, outflow from node
@@ -58,21 +76,40 @@ class StreamNode(NetworkNode):
         try:
             outflow = self.get_outflow(timestep)
         except IndexError:
-            rain = rain_et["{}_rain".format(self.node_id)][timestep]
-            et = rain_et["{}_evap".format(self.node_id)][timestep]
+            rainfall = rain_evap["{}_rain".format(self.node_id)]
+            evap = rain_evap["{}_evap".format(self.node_id)][timestep]
 
             # other extractions are ignored for stream nodes, so only extract irrigation ext.
             irrig_ext = extractions["{}_irrig".format(self.node_id)]
             ext = irrig_ext[timestep]
+            ts_rainfall = rainfall[timestep]
 
-            e_rain, storage, et = ihacres_funcs.ihacres_cmd(
-                M_k_m_1=self.storage, P_k=rain, E_k=et, d=self.d, e=self.e, f=self.f)
+            Mf, e_rainfall, recharge = ihacres_funcs.calc_ft_interim(self.storage, ts_rainfall, self.d,
+                                                                     self.d2, self.alpha)
+
+            et = ihacres_funcs.calc_ET(self.e, evap, Mf, self.f, self.d)
+            cmd = ihacres_funcs.calc_cmd(self.storage, ts_rainfall, et, e_rainfall, recharge)
 
             inflow = 0.0
             for nid in self.prev_node:
-                inflow += self.prev_node[nid].run(timestep, rain_et, extractions)
+                inflow += self.prev_node[nid].run(timestep, rain_evap, extractions)
             # End for
             self.inflow = (timestep, inflow)
+
+            quick_store, slow_store, outflow = ihacres_funcs.calc_ft_flows(self.quickflow, self.slowflow,
+                                                                           e_rainfall, recharge, self.area,
+                                                                           self.a, self.b, loss=0.0)
+
+            # DEBUG: modifier
+            quick_store = quick_store / self.flow_mod
+            slow_store = slow_store / self.flow_mod
+            outflow = outflow / self.flow_mod
+
+            if self.next_node and ('dam' not in type(self.next_node).__name__.lower()):
+                cmd, outflow = ihacres_funcs.routing(cmd, self.storage_coef, inflow, outflow, ext, gamma=0.0)
+            else:
+                outflow = ihacres_funcs.calc_outflow(outflow, ext)
+            # End if
 
             # TODO: Calc stream level
             # if self.formula_type == 1:
@@ -86,11 +123,7 @@ class StreamNode(NetworkNode):
             #      :  *exp(par(6)/(1+exp(-par(7)*par(8))*tmp_flow**par(7)))
             #      :  +CTF
 
-            # routing(volume, storage_coef, node_inflow, local_inflow, irrig_ext, gamma=0.0)
-            # not sure what local_inflow is...
-            storage, outflow = ihacres_funcs.routing(storage, self.storage_coef, inflow, inflow, ext, gamma=0.0)
-
-            self.update_state(timestep, storage, e_rain, et, outflow)
+            self.update_state(timestep, cmd, e_rainfall, et, quick_store, slow_store, outflow)
         # End try
 
         return outflow

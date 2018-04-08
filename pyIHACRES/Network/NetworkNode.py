@@ -6,19 +6,30 @@ class NetworkNode(object):
     # End storage()
 
     @storage.setter
-    def storage(self, value):
-        self._storage.append(value)
+    def storage(self, ts_value):
+        if hasattr(ts_value, '__len__'):
+            self.append_timestep(self._storage, ts_value)
+        else:
+            self._storage.append(ts_value)
+        # End if
+
     # End storage()
 
     @property
     def effective_rainfall(self):
-        return self._effective_rainfall[-1]
+        try:
+            er = self._effective_rainfall[-1]
+        except IndexError:
+            er = 0.0
+        # End try
+
+        return er
     # End effective_rainfall()
 
     @effective_rainfall.setter
     def effective_rainfall(self, value):
         self._effective_rainfall.append(value)
-    # End storage()
+    # End effective_rainfall()
 
     @property
     def et(self):
@@ -77,26 +88,10 @@ class NetworkNode(object):
             if len(attribute) != (timestep + 1):
                 err_msg = "Timestep mismatch detected!\n"
                 err_msg += "Attempted to assign value for time step '{}', but array length was '{}'"\
-                           .format(timestep, len(attribute))
+                           .format(timestep + 1, len(attribute))
                 raise IndexError(err_msg)
             # End if
         # End try
     # End append_timestep()
-
-    def reset(self):
-        # self.a = a
-        # self.b = b
-        # self.h0 = h0
-        if hasattr(self, '_def_col'):
-            self.d = self._def_col[0]
-            self.e = self._def_col[1]
-            self.f = self._def_col[2]
-
-        self._outflow = []
-        self._storage = [self._initial_storage]  # storage volume or Catchment Moisture Deficit
-        self._effective_rainfall = []
-        self._et = []  # evapotranspiration
-        self._inflow = []  # inflow from each parent node
-    # End reset()
 
 # End NetworkNode()

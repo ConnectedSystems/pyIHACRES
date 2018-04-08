@@ -1,3 +1,3 @@
 from DamNode import DamNode
-from Network import Network, load_network
+from Network import Network
 from StreamNode import StreamNode
