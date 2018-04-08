@@ -3,12 +3,17 @@
     prev_node:
     next_node: 406201
     formula_type: 1
-    def_col:  # d, e, f parameters
-        - 166.59
-        - 1.047
-        - 125.68507
-    initial_storage: 0.0
+    def_col:  # d, d2, e, f parameters
+        - 95.578  # millimeters
+        - 1.743
+        - 1.047  # dimensionless
+        - 1.315  # dimensionless
+    alpha: 0.785
+    a: 99.134  # What are these parameters?
+    b: 0.259
+    initial_storage: 0.0  # initial CMD value, CMD > 0 means there is a deficit
     storage_coef: 2.9
+    area: 268.77  # subcatchment area in km^2
 
 406219:
     node_type: StreamNode
@@ -16,11 +21,16 @@
     next_node: 406000
     formula_type: 1
     def_col:
-        - 400
-        - 1.1
-        - 0.5 # 1040
-    initial_storage: 0.0
+        - 200.0
+        - 2.0
+        - 1.0
+        - 0.8
+    alpha: 0.727
+    a: 54.352
+    b: 0.187
+    initial_storage: 150.0
     storage_coef: 2.9
+    area: 1985.73
 
 406000:
     node_type: DamNode
@@ -30,7 +40,8 @@
     initial_storage: 300000.0
     max_storage: 306000.0
     formula_type: 0
-    storage_coef: 0.0
+    storage_coef: 0.001
+    area: 30.11
 
 406201:
     node_type: StreamNode
@@ -40,11 +51,16 @@
     next_node: 406218
     formula_type: 1
     def_col:
-        - 400
+        - 200.0
+        - 2.0
         - 1
-        - 160
+        - 1.4
+    alpha: 0.95
+    a: 0.9
+    b: 0.1
     initial_storage: 0.0
     storage_coef: 2.9
+    area: 452.22
 
 406224:
     node_type: StreamNode
@@ -52,11 +68,16 @@
     next_node: 406218
     formula_type: 1
     def_col:
-        - 154.88928
+        - 71.708
+        - 2.16
         - 0.995
-        - 87.914008
+        - 1.226
+    alpha: 0.722
+    a: 68.585
+    b: 0.388
     initial_storage: 0.0
     storage_coef: 2.9
+    area: 220.71
 
 406218:
     node_type: StreamNode
@@ -66,11 +87,16 @@
     next_node: 406202
     formula_type: 1
     def_col:
-        - 400
+        - 200.0
+        - 2.0
         - 1
-        - 160
+        - 0.8
+    alpha: 0.95
+    a: 0.9
+    b: 0.1
     initial_storage: 0.0
     storage_coef: 2.9
+    area: 254.07
 
 406202:
     node_type: StreamNode
@@ -79,11 +105,16 @@
     next_node: 406265
     formula_type: 1
     def_col:
-        - 400
+        - 200.0
+        - 2.0
         - 1
-        - 160
+        - 0.8
+    alpha: 0.95
+    a: 0.9
+    b: 0.1
     initial_storage: 0.0
     storage_coef: 2.9
+    area: 62.78
 
 406265:
     node_type: StreamNode
@@ -92,8 +123,13 @@
     next_node:
     formula_type: 1
     def_col:
-        - 400
+        - 200.0
+        - 2.0
         - 1
-        - 160
+        - 0.8
+    alpha: 0.95
+    a: 0.9
+    b: 0.1
     initial_storage: 0.0
     storage_coef: 2.9
+    area: 162.84
