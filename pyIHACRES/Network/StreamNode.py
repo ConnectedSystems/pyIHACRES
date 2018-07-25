@@ -74,61 +74,62 @@ class StreamNode(NetworkNode):
 
         :returns: float, outflow from node
         """
-        try:
-            outflow = self.get_outflow(timestep)
-        except IndexError:
-            rainfall = rain_evap["{}_rain".format(self.node_id)]
-            evap = rain_evap["{}_evap".format(self.node_id)][timestep]
+        # try:
+        #     outflow = self.get_outflow(timestep)
+        # except IndexError:
+        #     pass
+        # # End try
+        rainfall = rain_evap["{}_rain".format(self.node_id)]
+        evap = rain_evap["{}_evap".format(self.node_id)][timestep]
 
-            # other extractions are ignored for stream nodes, so only extract irrigation ext.
-            irrig_ext = extractions["{}_irrig".format(self.node_id)]
-            ext = irrig_ext[timestep]
-            ts_rainfall = rainfall[timestep]
+        # other extractions are ignored for stream nodes, so only extract irrigation ext.
+        irrig_ext = extractions["{}_irrig".format(self.node_id)]
+        ext = irrig_ext[timestep]
+        ts_rainfall = rainfall[timestep]
 
-            Mf, e_rainfall, recharge = ihacres_funcs.calc_ft_interim(self.storage, ts_rainfall, self.d,
-                                                                     self.d2, self.alpha)
+        Mf, e_rainfall, recharge = ihacres_funcs.calc_ft_interim(self.storage, ts_rainfall, self.d,
+                                                                 self.d2, self.alpha)
 
-            et = ihacres_funcs.calc_ET(self.e, evap, Mf, self.f, self.d)
-            cmd = ihacres_funcs.calc_cmd(self.storage, ts_rainfall, et, e_rainfall, recharge)
+        et = ihacres_funcs.calc_ET(self.e, evap, Mf, self.f, self.d)
+        cmd = ihacres_funcs.calc_cmd(self.storage, ts_rainfall, et, e_rainfall, recharge)
 
-            inflow = 0.0
-            for nid in self.prev_node:
-                inflow += self.prev_node[nid].run(timestep, rain_evap, extractions)
-            # End for
-            self.inflow = (timestep, inflow)
+        inflow = 0.0
+        for nid in self.prev_node:
+            inflow += self.prev_node[nid].run(timestep, rain_evap, extractions)
+        # End for
+        self.inflow = (timestep, inflow)
 
-            quick_store, slow_store, outflow = ihacres_funcs.calc_ft_flows(self.quickflow, self.slowflow,
-                                                                           e_rainfall, recharge, self.area,
-                                                                           self.a, self.b, loss=0.0)
+        quick_store, slow_store, outflow = ihacres_funcs.calc_ft_flows(self.quickflow, self.slowflow,
+                                                                       e_rainfall, recharge, self.area,
+                                                                       self.a, self.b, loss=0.0)
 
-            # DEBUG: modifier
-            if self.flow_mod:
-                quick_store = quick_store / self.flow_mod
-                slow_store = slow_store / self.flow_mod
-                outflow = outflow / self.flow_mod
-                # print("Modded Quick, slow, outflow")
-                # print(quick_store, slow_store, outflow)
+        # DEBUG: modifier
+        if self.flow_mod:
+            quick_store = quick_store / self.flow_mod
+            slow_store = slow_store / self.flow_mod
+            outflow = outflow / self.flow_mod
+            # print("Modded Quick, slow, outflow")
+            # print(quick_store, slow_store, outflow)
 
-            if self.next_node and ('dam' not in type(self.next_node).__name__.lower()):
-                cmd, outflow = ihacres_funcs.routing(cmd, self.storage_coef, inflow, outflow, ext, gamma=0.0)
-            else:
-                outflow = ihacres_funcs.calc_outflow(outflow, ext)
-            # End if
+        if self.next_node and ('dam' not in type(self.next_node).__name__.lower()):
+            cmd, outflow = ihacres_funcs.routing(cmd, self.storage_coef, inflow, outflow, ext, gamma=0.0)
+        else:
+            outflow = ihacres_funcs.calc_outflow(outflow, ext)
+        # End if
 
-            # TODO: Calc stream level
-            # if self.formula_type == 1:
-            #     waterlevel = 1.0 * np.exp
+        # TODO: Calc stream level
+        # if self.formula_type == 1:
+        #     waterlevel = 1.0 * np.exp
 
-            #       if (formula.eq.1) then
-            # c      write(*,*) 'i'
-            #        waterlevel=1.0d0
-            #      :  *exp(par(1))*(tmp_flow**par(2))
-            #      :  *1.0d0/((1.0d0+(tmp_flow/par(3))**par(4))**(par(5)/par(4)))
-            #      :  *exp(par(6)/(1+exp(-par(7)*par(8))*tmp_flow**par(7)))
-            #      :  +CTF
+        #       if (formula.eq.1) then
+        # c      write(*,*) 'i'
+        #        waterlevel=1.0d0
+        #      :  *exp(par(1))*(tmp_flow**par(2))
+        #      :  *1.0d0/((1.0d0+(tmp_flow/par(3))**par(4))**(par(5)/par(4)))
+        #      :  *exp(par(6)/(1+exp(-par(7)*par(8))*tmp_flow**par(7)))
+        #      :  +CTF
 
-            self.update_state(timestep, cmd, e_rainfall, et, quick_store, slow_store, outflow)
-        # End try
+        self.update_state(timestep, cmd, e_rainfall, et, quick_store, slow_store, outflow)
 
         return outflow
     # End run()
