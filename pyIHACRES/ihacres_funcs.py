@@ -13,7 +13,6 @@ def calc_cmd(prev_cmd, rainfall, et, effective_rainfall, recharge):
     cmd = prev_cmd + et + effective_rainfall + recharge - rainfall  # units in mm
     # cmd = interim_cmd - rainfall + et + effective_rainfall
     return max(0.0, cmd)
-
 # End calc_cmd()
 
 
@@ -296,6 +295,7 @@ def calc_outflow(flow, extractions):
 
 def calc_ft_flows(prev_quick, prev_slow, e_rain, recharge, area, a, b, loss=0.0):
     """
+    Fortran port of flow calculation.
 
     :param prev_quick: float, previous quickflow storage
     :param prev_slow: float, previous slowflow storage

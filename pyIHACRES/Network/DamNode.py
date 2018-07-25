@@ -65,6 +65,14 @@ class DamNode(StreamNode):
     # End update_state()
 
     def run(self, timestep, rain_et, extractions):
+        """Calculate outflow for the dam node for a single time step.
+
+        :param timestep: int, current time step.
+        :param rain_et: dict, time series of rain and evapotranspiration data in mm
+        :param extractions: dict, time series of extraction data in ML
+
+        :returns: numeric, outflow from Dam
+        """
 
         try:
             outflow = self.get_outflow(timestep)
@@ -85,11 +93,8 @@ class DamNode(StreamNode):
             # End for
             self.inflow = (timestep, inflow)
 
-            # volume, node_inflow, gamma, rain, evap, infiltration, area, extractions, discharge
-            # storage = dam_funcs.dam_volume_update(self.storage, inflow, 0.0, rain, et, 0.0,
-            #                                       dam_area, ext, discharge)
             storage = dam_funcs.dam_volume_update(self.storage, inflow, 0.0, rain, et, 0.0,
-                                                  dam_area, ext, discharge)
+                                                  dam_area, ext, discharge, self.max_storage)
 
             outflow = dam_funcs.calc_dam_outflow(discharge, irrig_ext)
 

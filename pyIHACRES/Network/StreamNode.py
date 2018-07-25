@@ -38,7 +38,7 @@ class StreamNode(NetworkNode):
         return self._slowflow[-1]
     # End slowflow()
 
-    def set_calib_params(self, def_col, s_coef, alpha, a, b, flow_mod):
+    def set_calib_params(self, def_col, s_coef, alpha, a, b, flow_mod=None):
         self.d = def_col[0]
         self.d2 = def_col[1]
         self.e = def_col[2]
@@ -47,6 +47,7 @@ class StreamNode(NetworkNode):
         self.alpha = alpha
         self.a = a
         self.b = b
+
         self.flow_mod = flow_mod
 
     # End set_calib_params()
@@ -101,9 +102,12 @@ class StreamNode(NetworkNode):
                                                                            self.a, self.b, loss=0.0)
 
             # DEBUG: modifier
-            quick_store = quick_store / self.flow_mod
-            slow_store = slow_store / self.flow_mod
-            outflow = outflow / self.flow_mod
+            if self.flow_mod:
+                quick_store = quick_store / self.flow_mod
+                slow_store = slow_store / self.flow_mod
+                outflow = outflow / self.flow_mod
+                # print("Modded Quick, slow, outflow")
+                # print(quick_store, slow_store, outflow)
 
             if self.next_node and ('dam' not in type(self.next_node).__name__.lower()):
                 cmd, outflow = ihacres_funcs.routing(cmd, self.storage_coef, inflow, outflow, ext, gamma=0.0)

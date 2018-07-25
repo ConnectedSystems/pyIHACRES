@@ -77,14 +77,14 @@ def calc_dam_discharge(volume, max_storage):
 # End calc_dam_discharge()
 
 
-def dam_volume_update(volume, node_inflow, gamma, rain, evap, infiltration, area, extractions, discharge):
+def dam_volume_update(volume, node_inflow, gamma, rain, evap, infiltration, area, extractions, discharge, max_store):
     """Update dam volume for timestep
 
     gamma is gw exchange
     """
     vol = volume + (node_inflow + gamma) + (rain - evap - infiltration) * area - extractions - discharge
 
-    return max(0.0, vol)
+    return max(0.0, min(max_store, vol))
 # End dam_volume_update()
 
 
