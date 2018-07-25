@@ -313,7 +313,7 @@ def calc_ft_flows(prev_quick, prev_slow, e_rain, recharge, area, a, b, loss=0.0)
         quick_store = 1.0 / (1.0 + a) * (prev_quick + e_rain * area - loss / 2.0)
         outflow = a * quick_store
     else:
-        a2 = 0.0 if loss == 0.0 else max(0.0, min(1.0, prev_quick + e_rain * area / loss))
+        a2 = 0.0 if loss == 0.0 else max(0.0, min(1.0, (prev_quick + e_rain * area) / loss))
         quick_store = prev_quick + e_rain * area - a2 * loss
         outflow = 0.0
     # End if
