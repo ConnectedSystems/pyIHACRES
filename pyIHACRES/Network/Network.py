@@ -1,7 +1,7 @@
 import yaml
 
-from DamNode import DamNode
-from StreamNode import StreamNode
+from .DamNode import DamNode
+from .StreamNode import StreamNode
 
 
 class Network(object):

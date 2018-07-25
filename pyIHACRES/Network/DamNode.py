@@ -1,4 +1,4 @@
-from StreamNode import StreamNode
+from .StreamNode import StreamNode
 
 from .. import dam_funcs
 

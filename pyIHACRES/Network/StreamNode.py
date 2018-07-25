@@ -1,6 +1,6 @@
 from __future__ import division
 
-from NetworkNode import NetworkNode
+from .NetworkNode import NetworkNode
 
 from .. import ihacres_funcs
 
