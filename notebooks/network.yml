@@ -4,13 +4,13 @@ Murrindindi:
     next_node:
     formula_type: 1
     def_col:  # d, d2, e, f parameters
-        - 150.004294  # millimeters
-        - 2.11474
-        - 0.99908  # dimensionless
-        - 0.73809  # dimensionless
-    alpha: 0.36954
-    a: 54.35185  # What are these parameters?
-    b: 0.013664
+        - 150.0  # millimeters
+        - 1.964009
+        - 0.987777  # dimensionless
+        - 0.707653  # dimensionless
+    alpha: 0.240195
+    a: 54.35207  # What are these parameters?
+    b: 0.012689
     initial_storage: 0.0  # initial CMD value, CMD > 0 means there is a deficit
     storage_coef: 2.5
     area: 130.0  # subcatchment area in km^2
