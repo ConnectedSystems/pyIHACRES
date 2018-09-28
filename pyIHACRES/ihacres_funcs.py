@@ -1,7 +1,7 @@
 from __future__ import division
 
 from math import atan, exp, log, pi, tan
-
+import numpy as np
 
 def calc_cmd(prev_cmd, rainfall, et, effective_rainfall, recharge):
     """Calculate Catchment Moisture Deficit.
@@ -254,15 +254,17 @@ def routing(volume, storage_coef, inflow, flow, irrig_ext, gamma=0.0):
     :param volume: float, catchment moisture deficit
     :param storage_coef: float, unknown parameter
     :param inflow: float, incoming streamflow (flow from previous node)
-    :param flow: float, flow for the node
+    :param flow: float, flow for the node (local flow)
     :param irrig_ext: float, volume of irrigation extraction in ML.
     :param gamma: float, unknown parameter which is always set to 0.0 in the original Fortran implementation.
 
     :returns: tuple[float], (cmd in mm, and streamflow in ML/day)
     """
+    # print("Vol, inflow, l flow, gamma, irrig")
+    # print(volume, inflow, flow, gamma, irrig_ext)
     threshold = volume + (inflow + flow + gamma) - irrig_ext
-    if threshold > 0.0:
-        volume = (1.0 / (1.0 + storage_coef)) * threshold
+    if threshold > 0.0 and not np.isclose(threshold, 0.0):
+        volume = 1.0 / (1.0 + storage_coef) * threshold
         outflow = storage_coef * volume
     else:
         volume = threshold
@@ -309,22 +311,31 @@ def calc_ft_flows(prev_quick, prev_slow, e_rain, recharge, area, a, b, loss=0.0)
     :returns: tuple[float], quick store, slow store, outflow
     """
     a2 = 0.5
-    if (prev_quick + e_rain * area - 0.5 * loss) > 0.0:
-        quick_store = 1.0 / (1.0 + a) * (prev_quick + e_rain * area - loss / 2.0)
+    tmp_calc = prev_quick + (e_rain * area)
+    if (tmp_calc - 0.5 * loss) > 0.0 \
+            and not np.isclose(0.0, (tmp_calc - 0.5 * loss)):
+
+        quick_store = 1.0 / (1.0 + a) * (tmp_calc - loss / 2.0)
         outflow = a * quick_store
     else:
-        a2 = 0.0 if loss == 0.0 else max(0.0, min(1.0, (prev_quick + e_rain * area) / loss))
-        quick_store = prev_quick + e_rain * area - a2 * loss
+        a2 = 0.0 if loss == 0.0 else max(0.0, min(1.0, (tmp_calc / loss)))
+        quick_store = tmp_calc - a2 * loss
         outflow = 0.0
     # End if
 
+    assert outflow >= 0.0, "Calculating quick store: Outflow cannot be negative"
+
     b2 = 1.0 - a2
-    if (prev_slow + recharge * area - b2 * loss) > 0.0:
-        slow_store = 1.0 / (1.0 + b) * (prev_slow + recharge * area - loss * b2)
+    tmp_calc = prev_slow + (recharge * area)
+    if ((tmp_calc - b2 * loss) > 0.0) \
+            and not np.isclose(0.0, (tmp_calc - b2 * loss)):
+        slow_store = 1.0 / (1.0 + b) * (tmp_calc - loss * b2)
         outflow = outflow + b * slow_store
     else:
-        slow_store = prev_slow + recharge * area - b2 * loss
+        slow_store = tmp_calc - b2 * loss
     # End if
+
+    assert outflow >= 0.0, "Calculating slow store: Outflow cannot be negative"
 
     return quick_store, slow_store, outflow
 # End calc_ft_flows()

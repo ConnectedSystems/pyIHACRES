@@ -6,6 +6,8 @@ def calc_dam_level(volume):
 
     Adapted from Fortran code by Barry Croke.
 
+    # TODO: Generalize
+
     :math:`l = 156.8 + (0.9463 * v**0.2922)`
 
     where
@@ -29,6 +31,8 @@ def calc_dam_area(volume):
     """Calculate dam area from its volume.
 
     Adapted from Fortran code by Barry Croke.
+
+    TODO: Generalize
 
     :math:`A = 0.0021 * v**0.762`
 
@@ -80,7 +84,19 @@ def calc_dam_discharge(volume, max_storage):
 def dam_volume_update(volume, node_inflow, gamma, rain, evap, infiltration, area, extractions, discharge, max_store):
     """Update dam volume for timestep
 
-    gamma is gw exchange
+    :param volume: float, current water volume in ML
+    :param node_inflow: float, inflow from previous node in ML
+    :param gamma: float, groundwater exchange
+    :param rain: float, rainfall input
+    :param evap: float, evaporation loss
+    :param infiltration: float, infiltration loss
+    :param area: float, dam surface area in square kilometers
+    :param extractions: float, water extraction from dam in ML
+    :param discharge: float, discharge from dam in ML
+    :param max_store: float, maximum dam storage in ML
+
+    :returns: float, volume of water stored in dam
+
     """
     vol = volume + (node_inflow + gamma) + (rain - evap - infiltration) * area - extractions - discharge
 
@@ -103,8 +119,8 @@ if __name__ == '__main__':
 
     level = calc_dam_level(volume)
     area = calc_dam_area(volume)
-    discharge = calc_dam_discharge(volume, 304650.0)
-    volume = dam_volume_update(volume, 10, 0.3, 20.0, 3.0, 0.0, area, irrig_ext + other_extraction, discharge)
+    discharge = calc_dam_discharge(volume, volume)
+    volume = dam_volume_update(volume, 10, 0.3, 20.0, 3.0, 0.0, area, irrig_ext + other_extraction, discharge, volume)
 
     print("""
     Dam Level: {}

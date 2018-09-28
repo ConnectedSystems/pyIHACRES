@@ -12,7 +12,6 @@ class NetworkNode(object):
         else:
             self._storage.append(ts_value)
         # End if
-
     # End storage()
 
     @property
@@ -70,6 +69,11 @@ class NetworkNode(object):
         """
         self.append_timestep(self._outflow, ts_value)
     # End outflow.setter()
+
+    @property
+    def node_type(self):
+        return type(self).__name__.lower()
+    # End node_type()
 
     def get_outflow(self, timestep):
         """Get outflow for a given timestep

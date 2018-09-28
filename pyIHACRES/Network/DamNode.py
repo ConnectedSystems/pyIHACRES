@@ -54,6 +54,7 @@ class DamNode(StreamNode):
     @discharge.setter
     def discharge(self, value):
         self._discharge.append(value)
+    # End discharge()
 
     def update_state(self, timestep, storage, rainfall, et, area, discharge, outflow):
         self.storage = storage
@@ -73,34 +74,34 @@ class DamNode(StreamNode):
 
         :returns: numeric, outflow from Dam
         """
+        # try:
+        #     outflow = self.get_outflow(timestep)
+        # except IndexError:
+        #     pass
+        # # End try
+        rain = rain_et["{}_rain".format(self.node_id)][timestep]
+        et = rain_et["{}_evap".format(self.node_id)][timestep]
+        irrig_ext = extractions["{}_irrig".format(self.node_id)][timestep]
+        other = extractions["{}_other".format(self.node_id)][timestep]
+        ext = irrig_ext + other
 
-        try:
-            outflow = self.get_outflow(timestep)
-        except IndexError:
-            rain = rain_et["{}_rain".format(self.node_id)][timestep]
-            et = rain_et["{}_evap".format(self.node_id)][timestep]
-            irrig_ext = extractions["{}_irrig".format(self.node_id)][timestep]
-            other = extractions["{}_other".format(self.node_id)][timestep]
-            ext = irrig_ext + other
+        dam_area = dam_funcs.calc_dam_area(self.storage)
+        discharge = dam_funcs.calc_dam_discharge(self.storage, self.max_storage)
 
-            dam_area = dam_funcs.calc_dam_area(self.storage)
+        inflow = 0.0
+        for nid in self.prev_node:
+            inflow += self.prev_node[nid].run(timestep, rain_et, extractions)
+        # End for
 
-            discharge = dam_funcs.calc_dam_discharge(self.storage, self.max_storage)
+        self.inflow = (timestep, inflow)
 
-            inflow = 0.0
-            for nid in self.prev_node:
-                inflow += self.prev_node[nid].run(timestep, rain_et, extractions)
-            # End for
-            self.inflow = (timestep, inflow)
+        storage = dam_funcs.dam_volume_update(self.storage, inflow, 0.0, rain, et, 0.0,
+                                              dam_area, ext, discharge, self.max_storage)
 
-            storage = dam_funcs.dam_volume_update(self.storage, inflow, 0.0, rain, et, 0.0,
-                                                  dam_area, ext, discharge, self.max_storage)
+        outflow = dam_funcs.calc_dam_outflow(discharge, irrig_ext)
 
-            outflow = dam_funcs.calc_dam_outflow(discharge, irrig_ext)
-
-            # area, discharge, storage, outflow = self.calc_outflow(rain, et, irrig_ext, extractions)
-            self.update_state(timestep, storage, rain, et, dam_area, discharge, outflow)
-        # End try
+        # area, discharge, storage, outflow = self.calc_outflow(rain, et, irrig_ext, extractions)
+        self.update_state(timestep, storage, rain, et, dam_area, discharge, outflow)
 
         return outflow
     # End run()
