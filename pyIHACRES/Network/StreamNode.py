@@ -15,7 +15,7 @@ class StreamNode(NetworkNode):
         self.formula_type = formula_type
         self.area = area
 
-        self.set_calib_params(def_col, storage_coef, alpha, a, b, flow_mod=1.0)
+        self.set_calib_params(def_col, storage_coef, alpha, a, b)
 
         self._quickflow = [0.0]
         self._slowflow = [0.0]
@@ -38,7 +38,7 @@ class StreamNode(NetworkNode):
         return self._slowflow[-1]
     # End slowflow()
 
-    def set_calib_params(self, def_col, s_coef, alpha, a, b, flow_mod=None):
+    def set_calib_params(self, def_col, s_coef, alpha, a, b):
         self.d = def_col[0]
         self.d2 = def_col[1]
         self.e = def_col[2]
@@ -48,12 +48,13 @@ class StreamNode(NetworkNode):
         self.a = a
         self.b = b
 
-        self.flow_mod = flow_mod
+        assert 0.0 < alpha < 1.0, "parameter `alpha` has to be between 0 and 1, alpha was set to {}".format(alpha)
 
     # End set_calib_params()
 
     def get_flows(self):
         return self._quickflow[-1], self._slowflow[-1], self._outflow[-1]
+    # End get_flows()
 
     def update_state(self, timestep, storage, effective_rainfall, et, qflow_store, sflow_store, outflow):
         self.storage = (timestep, storage)
@@ -65,7 +66,7 @@ class StreamNode(NetworkNode):
         self.append_timestep(self._slowflow, (timestep, sflow_store))
     # End update_state()
 
-    def run(self, timestep, rain_evap, extractions):
+    def run(self, timestep, rain_evap, extractions, gamma_k=0.0, loss=0.0):
         """Run node to calculate outflow and update state.
 
         :param timestep: int, time step
@@ -101,18 +102,10 @@ class StreamNode(NetworkNode):
 
         quick_store, slow_store, outflow = ihacres_funcs.calc_ft_flows(self.quickflow, self.slowflow,
                                                                        e_rainfall, recharge, self.area,
-                                                                       self.a, self.b, loss=0.0)
+                                                                       self.a, self.b, loss=loss)
 
-        # DEBUG: modifier
-        if self.flow_mod:
-            quick_store = quick_store / self.flow_mod
-            slow_store = slow_store / self.flow_mod
-            outflow = outflow / self.flow_mod
-            # print("Modded Quick, slow, outflow")
-            # print(quick_store, slow_store, outflow)
-
-        if self.next_node and ('dam' not in type(self.next_node).__name__.lower()):
-            cmd, outflow = ihacres_funcs.routing(cmd, self.storage_coef, inflow, outflow, ext, gamma=0.0)
+        if self.next_node:  # and ('dam' not in self.next_node.node_type):
+            cmd, outflow = ihacres_funcs.routing(cmd, self.storage_coef, inflow, outflow, ext, gamma=gamma_k)
         else:
             outflow = ihacres_funcs.calc_outflow(outflow, ext)
         # End if

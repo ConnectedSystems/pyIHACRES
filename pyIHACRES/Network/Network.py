@@ -80,10 +80,11 @@ class Network(object):
         node = self.network[self.first_node]
         while node is not None:
             node = self.run_node(node)
+        # End while
 
     # End run_timestep()
 
     def reset(self):
         tmp = Network(self.network_details, self.first_node)
         self.network = tmp.network
-    # End for
+    # End reset()
