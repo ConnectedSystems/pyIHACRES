@@ -14,7 +14,7 @@ except ImportError:
     # End find_packages()
 # End try
 
-
+pkg_list = ['numpy', 'pandas', 'matplotlib', 'seaborn', 'PyYAML', 'sklearn']
 config = {
     'description': 'pyIHACRES',
     'author': 'Takuya Iwanaga, Barry F.W. Croke',
@@ -22,7 +22,7 @@ config = {
     'download_url': 'https://github.com/ConnectedSystems/pyIHACRES/archive/master.zip',
     'author_email': 'iwanaga.takuya@anu.edu.au',
     'version': '0.1',
-    'install_requires': ['numpy', 'pandas', 'matplotlib', 'seaborn'],
+    'install_requires': pkg_list,
     'packages': find_packages(),
     'scripts': [],
     'name': 'pyIHACRES'
