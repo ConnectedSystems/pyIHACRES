@@ -271,16 +271,6 @@ def routing(volume, storage_coef, inflow, flow, irrig_ext, gamma=0.0):
         outflow = 0.0
     # End if
 
-#     v1=volume+(node_inflow+local_inflow+Gamma_k)-irrig_ext
-#
-#     if (v1.gt.0) then
-#      volume = 1/(1+storage_coef) * v1
-#      outflow=storage_coef*volume
-#     else
-#      volume = v1
-#      outflow=0.0
-#     endif
-
     return volume, outflow
 # End routing()
 
@@ -296,8 +286,7 @@ def calc_outflow(flow, extractions):
 
 
 def calc_ft_flows(prev_quick, prev_slow, e_rain, recharge, area, a, b, loss=0.0):
-    """
-    Fortran port of flow calculation.
+    """Fortran port of flow calculation.
 
     :param prev_quick: float, previous quickflow storage
     :param prev_slow: float, previous slowflow storage
