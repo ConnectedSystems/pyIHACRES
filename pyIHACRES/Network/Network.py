@@ -28,7 +28,7 @@ class Network(object):
     @staticmethod
     def load_network(fn, first_node='node_1'):
         with open(fn, 'r') as network_config:
-            network_details = yaml.load(network_config)
+            network_details = yaml.load(network_config, Loader=yaml.FullLoader)
 
         return Network(network_details, first_node)
     # End load_network()
