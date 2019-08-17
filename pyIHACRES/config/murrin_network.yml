@@ -1,0 +1,16 @@
+Murrindindi:
+    node_type: StreamNode
+    prev_node:
+    next_node:
+    formula_type: 1
+    def_col:  # d, d2, e, f parameters
+        - 150.0  # millimeters
+        - 1.964009
+        - 0.987777  # dimensionless
+        - 0.707653  # dimensionless
+    alpha: 0.240195
+    a: 54.35207
+    b: 0.012689
+    initial_storage: 0.0  # initial CMD value, CMD > 0 means there is a deficit
+    storage_coef: 2.5
+    area: 104.9  # subcatchment area in km^2
