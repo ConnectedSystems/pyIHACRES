@@ -66,20 +66,17 @@ class StreamNode(NetworkNode):
         self.append_timestep(self._slowflow, (timestep, sflow_store))
     # End update_state()
 
-    def run(self, timestep, rain_evap, extractions, gamma_k=0.0, loss=0.0):
+    def run(self, timestep, rain_evap, extractions, gw_exchange=0.0, loss=0.0):
         """Run node to calculate outflow and update state.
 
         :param timestep: int, time step
         :param rain_evap: np.ndarray, rainfall and evapotranspiration data for all nodes
         :param extractions: np.ndarray, irrigation and other water extractions for all nodes
+        :param gw_exchange: float, flux in ML - positive is contribution, negative is infiltration
+        :param loss: float
 
         :returns: float, outflow from node
         """
-        # try:
-        #     outflow = self.get_outflow(timestep)
-        # except IndexError:
-        #     pass
-        # # End try
         rainfall = rain_evap["{}_rain".format(self.node_id)]
         evap = rain_evap["{}_evap".format(self.node_id)][timestep]
 
@@ -105,7 +102,7 @@ class StreamNode(NetworkNode):
                                                                        self.a, self.b, loss=loss)
 
         if self.next_node:  # and ('dam' not in self.next_node.node_type):
-            cmd, outflow = ihacres_funcs.routing(cmd, self.storage_coef, inflow, outflow, ext, gamma=gamma_k)
+            cmd, outflow = ihacres_funcs.routing(cmd, self.storage_coef, inflow, outflow, ext, gamma=gw_exchange)
         else:
             outflow = ihacres_funcs.calc_outflow(outflow, ext)
         # End if

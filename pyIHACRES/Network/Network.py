@@ -23,10 +23,15 @@ class Network(object):
         self.network = network
         self.first_node = first_node
         self.ts = 0
-    # End init()
+    # End __init__()
 
     @staticmethod
     def load_network(fn, first_node='node_1'):
+        """Load a network specification.
+
+        :param fn: str, filename of YAML file to load spec from
+        :param first_node: str, id of first node.
+        """
         with open(fn, 'r') as network_config:
             network_details = yaml.load(network_config, Loader=yaml.FullLoader)
 
@@ -85,6 +90,7 @@ class Network(object):
     # End run_timestep()
 
     def reset(self):
+        """Reset network"""
         tmp = Network(self.network_details, self.first_node)
         self.network = tmp.network
     # End reset()

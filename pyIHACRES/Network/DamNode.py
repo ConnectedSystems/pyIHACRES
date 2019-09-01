@@ -74,11 +74,6 @@ class DamNode(StreamNode):
 
         :returns: numeric, outflow from Dam
         """
-        # try:
-        #     outflow = self.get_outflow(timestep)
-        # except IndexError:
-        #     pass
-        # # End try
         rain = rain_et["{}_rain".format(self.node_id)][timestep]
         et = rain_et["{}_evap".format(self.node_id)][timestep]
         irrig_ext = extractions["{}_irrig".format(self.node_id)][timestep]

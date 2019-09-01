@@ -248,21 +248,21 @@ def calc_flows(prev_flows, v_s, e_rainfall, taus):
 # End calc_flows()
 
 
-def routing(volume, storage_coef, inflow, flow, irrig_ext, gamma=0.0):
+def routing(volume, storage_coef, inflow, flow, irrig_ext, gw_exchange=0.0):
     """Linear routing used to convert effective rainfall into streamflow for a given time step.
 
     :param volume: float, catchment moisture deficit
-    :param storage_coef: float, unknown parameter
+    :param storage_coef: float, storage factor
     :param inflow: float, incoming streamflow (flow from previous node)
     :param flow: float, flow for the node (local flow)
-    :param irrig_ext: float, volume of irrigation extraction in ML.
-    :param gamma: float, unknown parameter which is always set to 0.0 in the original Fortran implementation.
+    :param irrig_ext: float, volume of irrigation extraction in ML
+    :param gw_exchange: float, groundwater flux. Defaults to 0.0
 
     :returns: tuple[float], (cmd in mm, and streamflow in ML/day)
     """
     # print("Vol, inflow, l flow, gamma, irrig")
     # print(volume, inflow, flow, gamma, irrig_ext)
-    threshold = volume + (inflow + flow + gamma) - irrig_ext
+    threshold = volume + (inflow + flow + gw_exchange) - irrig_ext
     if threshold > 0.0 and not np.isclose(threshold, 0.0):
         volume = 1.0 / (1.0 + storage_coef) * threshold
         outflow = storage_coef * volume
