@@ -34,8 +34,7 @@
 
 406000:
     node_type: DamNode
-    prev_node:
-        - 406219
+    prev_node: 406219
     next_node: 406201
     initial_storage: 300000.0
     max_storage: 306000.0
@@ -100,8 +99,7 @@
 
 406202:
     node_type: StreamNode
-    prev_node:
-        - 406218
+    prev_node: 406218
     next_node: 406265
     formula_type: 1
     def_col:
@@ -118,8 +116,7 @@
 
 406265:
     node_type: StreamNode
-    prev_node:
-        - 406202
+    prev_node: 406202
     next_node:
     formula_type: 1
     def_col:
