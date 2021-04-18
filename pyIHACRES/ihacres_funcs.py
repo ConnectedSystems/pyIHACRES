@@ -1,31 +1,37 @@
-from __future__ import division
-
+from typing import Dict, Tuple, Optional
 from math import atan, exp, log, pi, tan
 import numpy as np
 
-def calc_cmd(prev_cmd, rainfall, et, effective_rainfall, recharge):
+
+def calc_cmd(prev_cmd: float, rainfall: float, et: float, 
+             effective_rainfall: float, recharge: float) -> float:
     """Calculate Catchment Moisture Deficit.
 
     Min value of CMD is 0.0 and is in represented in mm depth.
     A value of 0 indicates that the catchment is fully saturated.
     A value greater than 0 means that there is a moisture deficit.
+
+    Returns
+    -------
+    cmd (in mm)
     """
-    cmd = prev_cmd + et + effective_rainfall + recharge - rainfall  # units in mm
-    # cmd = interim_cmd - rainfall + et + effective_rainfall
+    cmd = prev_cmd + et + effective_rainfall + recharge - rainfall
     return max(0.0, cmd)
 # End calc_cmd()
 
 
-def calc_interim_cmd(cmd, param_d, rainfall):
+def calc_interim_cmd(cmd: float, param_d: float, rainfall: float) -> float:
     """Calculate interim CMD (M_{f}) in its linear form.
 
-    Based on HydroMad implementation.
+    Parameters
+    ----------
+    cmd: current Catchment Moisture Deficit (M_{k})
+    param_d: model parameter factor `d`
+    rainfall: rainfall for current time step in mm
 
-    :param cmd: float, current Catchment Moisture Deficit (M_{k})
-    :param param_d: float, model parameter factor `d`
-    :param rainfall: float, rainfall for current time step in mm
-
-    :returns: float, interim CMD (M_{f})
+    Returns
+    -------
+    interim CMD (M_{f})
     """
     if cmd < param_d:
         Mf = cmd * exp(-rainfall / param_d)
@@ -39,16 +45,18 @@ def calc_interim_cmd(cmd, param_d, rainfall):
 # End calc_interim_cmd()
 
 
-def calc_trig_interim_cmd(cmd, param_d, rainfall):
+def calc_trig_interim_cmd(cmd: float, param_d: float, rainfall: float) -> float:
     """Calculate interim CMD (M_{f}) in its trigonometric form.
 
-    Based on HydroMad implementation.
+    Parameters
+    ----------
+    cmd: current Catchment Moisture Deficit (M_{k})
+    param_d: model parameter factor `d`
+    rainfall: rainfall for current time step in mm
 
-    :param cmd: float, current Catchment Moisture Deficit (M_{k})
-    :param param_d: float, model parameter factor `d`
-    :param rainfall: float, rainfall for current time step in mm
-
-    :returns: float, interim CMD (M_{f})
+    Returns
+    -------
+    interim CMD (M_{f})
     """
     if cmd < param_d:
         Mf = 1.0 / tan((cmd / param_d) * (pi / 2.0))
@@ -63,16 +71,23 @@ def calc_trig_interim_cmd(cmd, param_d, rainfall):
 # End calc_trig_interim_cmd()
 
 
-def calc_ft_interim(cmd, rain, d, d2, alpha):
+def calc_ft_interim(cmd: float, rain: float, 
+                    d: float, d2: float, alpha: float) -> Tuple[float, float, float]:
     """Direct port of original Fortran implementation to calculate interim CMD.
 
-    :param cmd: float, Catchment Moisture Deficit
-    :param rain: float, rainfall for time step in mm
-    :param d: float, flow threshold value
-    :param d2: float, scaling factor applied to `d`
-    :param alpha: float, took value from IHACRESparams.csv file for 406219 for dev purposes only
+    Calculates effective rainfall and recharge as a by-product.
 
-    :returns: tuple[float], interim CMD value, effective rainfall, recharge (all in mm)
+    Parameters
+    ----------
+    cmd: Catchment Moisture Deficit
+    rain: rainfall for time step in mm
+    d: flow threshold value
+    d2: scaling factor applied to `d`
+    alpha: took value from IHACRESparams.csv file for 406219 for dev purposes only
+
+    Returns
+    -------
+    (interim CMD value, effective rainfall, recharge)
     """
     d2 = d * d2
 
@@ -85,7 +100,7 @@ def calc_ft_interim(cmd, rain, d, d2, alpha):
 
     if tmp_cmd > (d2 + rain):
         # CMD never reaches d2, so all rain is effective
-        cmd = tmp_cmd - rain
+        Mf = tmp_cmd - rain
     else:
         if tmp_cmd > d2:
             tmp_rain = rain - (tmp_cmd - d2)  # leftover rain after reaching d2 threshold
@@ -105,7 +120,7 @@ def calc_ft_interim(cmd, rain, d, d2, alpha):
                 lam = exp(tmp_rain * (1.0 - alpha) / d2)
                 epsilon = alpha * eps
 
-                cmd = tmp_cmd / lam - epsilon * (1.0 - 1.0 / lam)
+                Mf = tmp_cmd / lam - epsilon * (1.0 - 1.0 / lam)
                 e_rain = 0.0
             else:
                 if (tmp_cmd > d1a):
@@ -113,31 +128,47 @@ def calc_ft_interim(cmd, rain, d, d2, alpha):
 
                 tmp_cmd = d1a
                 gamma = (alpha * d2 + (1.0 - alpha) * d1a) / (d1a * d2)
-                cmd = tmp_cmd * exp(-tmp_rain * gamma)
+                Mf = tmp_cmd * exp(-tmp_rain * gamma)
                 e_rain = alpha * (tmp_rain + 1.0 / d1a / gamma * (cmd - tmp_cmd))
             # End if
         else:
             gamma = (alpha * d2 + (1.0 - alpha) * d1a) / (d1a * d2)
-            cmd = tmp_cmd * exp(-tmp_rain * gamma)
+            Mf = tmp_cmd * exp(-tmp_rain * gamma)
             e_rain = alpha * (tmp_rain + 1.0 / d1a / gamma * (cmd - tmp_cmd))
         # End if
 
-        recharge = rain - (tmp_cmd - cmd) - e_rain
+        recharge = rain - (cmd - Mf) - e_rain
     # End if
 
     return cmd, e_rain, recharge
 # End calc_ft_interim()
 
 
-def calc_effective_rainfall(rainfall, cmd, Mf, d, d2, n=0.1):
+def calc_effective_rainfall(rainfall: float, cmd: float, 
+                            d: float, d2: float, n:Optional[float] = 0.1) -> float:
     """
-    :param rainfall: float, rainfall for time step
-    :param cmd: float, previous CMD value
-    :param Mf, float, interim CMD value
-    :param d: float, threshold value
-    :param d2: float, scaling factor applied to `d`
-    :param n: float, scaling factor taken from Croke & Jakeman (2004).
-              `n` = 0.1 in suitable for most cases
+    Estimate effective rainfall.
+
+    Parameters
+    ---------
+    rainfall: rainfall for time step
+    cmd: previous CMD value
+    Mf, interim CMD value
+    d: threshold value
+    d2: scaling factor applied to `d`
+    n: scaling factor (default = 0.1)
+       Default value is suitable for most cases (Croke & Jakeman, 2004)
+
+    Returns
+    -------
+    estimate of effective rainfall
+
+    References
+    ----------
+    .. [1] Croke, B.F.W., Jakeman, A.J. 2004
+           A catchment moisture deficit module for the IHACRES rainfall-runoff model, 
+           Environmental Modelling & Software, 19(1), pp. 1–5. 
+           doi: 10.1016/j.envsoft.2003.09.001.
     """
     d2 = d * d2
     if cmd > d2:
@@ -152,48 +183,48 @@ def calc_effective_rainfall(rainfall, cmd, Mf, d, d2, n=0.1):
 # End calc_effective_rainfall()
 
 
-def calc_effective_rainfall_orig(rainfall, cmd, Mf, d, d2):
-    d2 = d * d2
-    if cmd > d2:
-        e_rainfall = rainfall
-    else:
-        # effective rainfall = rainfall - prev_cmd + (cmd before ET loss is accounted for)
-        e_rainfall = max(0.0, rainfall - cmd + Mf)
-    # End if
-
-    return e_rainfall
-# End calc_effective_rainfall2()
-
-
-def calc_ET_from_temp(e, T, interim_cmd, f, d):
+def calc_ET_from_temperature(e: float, T: float, interim_cmd: float, 
+                             f: float, d: float) -> float:
     """Calculate evapotranspiration based on temperature data.
 
     Parameters `f` and `d` are used to calculate `g`, the value of the CMD
     which the ET rate will begin to decline due to insufficient
     water availability for plant transpiration.
 
-    :param e: float, temperature to PET conversion factor (a stress threshold)
-    :param T: float or None, temperature in degrees C
-    :param interim_cmd: float, Catchment Moisture Deficit prior to accounting for ET losses (`M_{f}`)
-    :param f: float, multiplication factor on `d`
-    :param d: float, flow threshold factor
+    Parameters
+    ----------
+    e: temperature to PET conversion factor (a stress threshold)
+    T: float or None, temperature in degrees C
+    interim_cmd: Catchment Moisture Deficit prior to accounting for ET losses (`M_{f}`)
+    f: multiplication factor on `d`
+    d: flow threshold factor
+
+    Returns
+    -------
+    estimate of evapotranspiration
     """
     param_g = f * d
     et = e * T * exp(2.0 * (1.0 - (interim_cmd / param_g)))
 
     # temperature can be negative, so we have a min cap of 0.0
     return max(0.0, et)
-# End calc_ET_from_temp()
+# End calc_ET_from_temperature()
 
 
-def calc_ET(e, evap, interim_cmd, f, d):
-    """Calculate evapotranspiration
+def calc_ET(e: float, evap: float, interim_cmd: float, f: float, d: float) -> float:
+    """Calculate evapotranspiration.
 
-    :param e: float, temperature to PET conversion factor (a stress threshold)
-    :param evap: float, evaporation for given time step.
-    :param interim_cmd: float, Catchment Moisture Deficit prior to accounting for ET losses (`M_{f}`)
-    :param f: float, calibrated parameter that acts as a multiplication factor on `d`
-    :param d: float, flow threshold factor
+    Parameters
+    ----------
+    e: temperature to PET conversion factor (a stress threshold)
+    evap: evaporation for given time step.
+    interim_cmd: Catchment Moisture Deficit prior to accounting for ET losses (`M_{f}`)
+    f: calibrated parameter that acts as a multiplication factor on `d`
+    d: flow threshold factor
+
+    Returns
+    -------
+    float, evapotranspiration
     """
     et = e * evap
     param_g = f * d
@@ -203,15 +234,19 @@ def calc_ET(e, evap, interim_cmd, f, d):
 # End calc_ET()
 
 
-def calc_flow(tau, flow, v, e_rainfall):
-    """Common function to calculate quick and slow flows.
+def calc_flow(tau: float, flow: float, v: float, e_rainfall: float) -> float:
+    """Estimate quick and slow flow.
 
-    :param tau: float, `tau` value for flow
-    :param flow: float, proportional quick or slow flow in ML/day
-    :param v: float, `v` parameter
-    :param e_rainfall: float, effective rainfall in mm (`E` parameter in literature)
+    Parameters
+    ----------
+    tau: `tau` value for flow
+    flow: proportional quick or slow flow in ML/day
+    v: `v` parameter
+    e_rainfall: effective rainfall in mm (`E` parameter in literature)
 
-    :returns: float, adjusted quick or slow flow in ML/day
+    Returns
+    -------
+    float, adjusted quick or slow flow in ML/day
     """
     # convert from 'tau' and 'v' to 'alpha' and 'beta'
     alpha = exp(-1.0 / tau)
@@ -223,20 +258,24 @@ def calc_flow(tau, flow, v, e_rainfall):
 # End calc_flow()
 
 
-def calc_flows(prev_flows, v_s, e_rainfall, taus):
+def calc_flows(prev_flows: Tuple[float], v_s: float, 
+               e_rainfall: float, taus: Dict[str, float]) -> Tuple[float, float, float]:
     """
-    Calculate quick and slow flow, and outflow.
+    Calculate quick/slow flow, and outflow.
 
-    Calculates flows for current time step based on previous flows and current effective rainfall.
+    Estimates flows for current time step based on previous flows and current effective rainfall.
 
-    :param prev_flows: tuple[float], previous quick and slow flow in ML/day
-    :param v_s: float, proportional amount that goes to slow flow. v_s <= 1.0
-    :param e_rainfall: float, current and previous effective rainfall
-    :param taus: dict[q, s], time constant, quick and slow flow tau variables.
-                               Represent the time required for the quickflow and slowflow
-                               responses to fall to :math:`1/e` of their initial values after an impulse of rainfall
+    prev_flows: previous quick and slow flow in ML/day
+    v_s: proportional amount that goes to slow flow. v_s <= 1.0
+    e_rainfall: current and previous effective rainfall
+    taus: time constant, quick and slow flow tau variables ("q", "s").
+            Represent the time required for the quickflow and slowflow
+            responses to fall to $1/e$ of their initial values 
+            after an impulse of rainfall
 
-    :returns: tuple[float], quick, slow, outflow in ML/day
+    Returns
+    -------
+    (quick, slow, outflow) in ML/day
     """
     prev_quick, prev_slow = prev_flows
     v_q = 1.0 - v_s  # proportional quick flow
@@ -248,20 +287,23 @@ def calc_flows(prev_flows, v_s, e_rainfall, taus):
 # End calc_flows()
 
 
-def routing(volume, storage_coef, inflow, flow, irrig_ext, gw_exchange=0.0):
+def routing(volume: float, storage_coef: float, inflow: float, flow: float, 
+            irrig_ext: float, gw_exchange: Optional[float]=0.0) -> Tuple[float, float]:
     """Linear routing used to convert effective rainfall into streamflow for a given time step.
 
-    :param volume: float, catchment moisture deficit
-    :param storage_coef: float, storage factor
-    :param inflow: float, incoming streamflow (flow from previous node)
-    :param flow: float, flow for the node (local flow)
-    :param irrig_ext: float, volume of irrigation extraction in ML
-    :param gw_exchange: float, groundwater flux. Defaults to 0.0
+    Parameters
+    ----------
+    volume: catchment moisture deficit
+    storage_coef: storage factor
+    inflow: incoming streamflow (flow from previous node)
+    flow: flow for the node (local flow)
+    irrig_ext: volume of irrigation extraction in ML
+    gw_exchange: groundwater flux (default = 0.0)
 
-    :returns: tuple[float], (cmd in mm, and streamflow in ML/day)
+    Returns
+    -------
+    (cmd in mm, and streamflow in ML/day)
     """
-    # print("Vol, inflow, l flow, gamma, irrig")
-    # print(volume, inflow, flow, gamma, irrig_ext)
     threshold = volume + (inflow + flow + gw_exchange) - irrig_ext
     if threshold > 0.0 and not np.isclose(threshold, 0.0):
         volume = 1.0 / (1.0 + storage_coef) * threshold
@@ -275,29 +317,39 @@ def routing(volume, storage_coef, inflow, flow, irrig_ext, gw_exchange=0.0):
 # End routing()
 
 
-def calc_outflow(flow, extractions):
-    """Calculate streamflow of node taking into account extractions
+def calc_outflow(flow: float, extractions: float) -> float:
+    """Calculate streamflow of node taking into account extractions.
 
-    :param flow: float, unmodified sum of quickflow and slowflow in ML/day
-    :param extractions: float, water extractions that occurred in ML/day
+    Parameters
+    ----------
+    flow: unmodified sum of quickflow and slowflow in ML/day
+    extractions: water extractions that occurred in ML/day
+
+    Returns
+    -------
+    Outflow
     """
     return max(0.0, flow - extractions)
 # End calc_outflow()
 
 
-def calc_ft_flows(prev_quick, prev_slow, e_rain, recharge, area, a, b, loss=0.0):
+def calc_ft_flows(prev_quick: float, prev_slow: float, e_rain: float, 
+                  recharge: float, area: float, 
+                  a: float, b: float, loss=0.0) -> Tuple[float, float, float]:
     """Fortran port of flow calculation.
 
-    :param prev_quick: float, previous quickflow storage
-    :param prev_slow: float, previous slowflow storage
-    :param e_rain: float, effective rainfall in mm
-    :param recharge: float, recharge amount in mm
-    :param area: float, catchment area in km^2
-    :param a: float, `a` factor controlling quickflow rate
-    :param b: float, `b` factor controlling slowflow rate
-    :param loss: float, losses in mm depth
+    prev_quick: previous quickflow storage
+    prev_slow: previous slowflow storage
+    e_rain: effective rainfall in mm
+    recharge: recharge amount in mm
+    area: catchment area in km^2
+    a: `a` factor controlling quickflow rate
+    b: `b` factor controlling slowflow rate
+    loss: losses in mm depth
 
-    :returns: tuple[float], quick store, slow store, outflow
+    Returns
+    -------
+    (quick store, slow store, outflow)
     """
     a2 = 0.5
     tmp_calc = prev_quick + (e_rain * area)
